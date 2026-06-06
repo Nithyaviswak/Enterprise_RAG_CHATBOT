@@ -1,0 +1,56 @@
+# Core Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic-settings==2.7.1
+
+# Google Gemini API
+google-genai==1.5.0
+
+# Embeddings & ML (Plugin: sentence-transformers)
+sentence-transformers==3.4.1
+torch>=2.0.0
+
+# Vector Store
+chromadb==0.6.3
+
+# Fine-tuning Pipeline (Plugin: finetune-embedding via LlamaIndex)
+llama-index-core>=0.13.0
+llama-index-finetuning>=0.4.0
+llama-index-embeddings-huggingface>=0.5.0
+
+# RAGFlow Client (Plugin: ragflow via HTTP API)
+httpx==0.28.1
+
+# Chat History Storage
+aiosqlite==0.20.0
+
+# Hybrid Search
+rank-bm25==0.2.2
+
+# Rate Limiting
+slowapi==0.1.9
+
+# Document Processing
+pypdf==5.4.0
+python-docx==1.1.2
+beautifulsoup4>=4.14.3
+
+# Auth
+firebase-admin==6.6.0
+
+# RAGAS Evaluation Framework
+ragas>=0.2.0
+datasets>=2.14.0
+
+# LangSmith Observability
+langsmith>=0.1.0
+
+# Enhanced Document Processing
+unstructured==0.22.31
+pytesseract>=0.3.10
+pdf2image>=1.17.0
+
+redis>=5.0.0
+
+
