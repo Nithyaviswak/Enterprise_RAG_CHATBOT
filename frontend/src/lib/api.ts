@@ -105,6 +105,58 @@ export async function healthCheck() {
   );
 }
 
+// ── Knowledge Graph API ────────────────────────────────────────
+
+export async function getGraphStats() {
+  return request<{ node_count: number; edge_count: number; entity_type_counts: Record<string, number>; relation_type_counts: Record<string, number>; documents_processed: number }>('/api/graph/stats');
+}
+
+export async function getGraphEntities(params?: { entity_type?: string; limit?: number; offset?: number; search?: string }) {
+  const query = new URLSearchParams();
+  if (params?.entity_type) query.set('entity_type', params.entity_type);
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.offset) query.set('offset', String(params.offset));
+  if (params?.search) query.set('search', params.search);
+  return request<{ entities: any[]; total: number }>(`/api/graph/entities?${query}`);
+}
+
+export async function getGraphEntityDetail(entityId: string) {
+  return request<any>(`/api/graph/entities/${entityId}`);
+}
+
+export async function exploreGraph(entityId: string, maxHops = 2, maxNodes = 50) {
+  return request<{ nodes: any[]; edges: any[]; central_entity: any }>(
+    `/api/graph/entities/${entityId}/neighborhood?max_hops=${maxHops}&max_nodes=${maxNodes}`
+  );
+}
+
+export async function searchGraph(query: string, entityTypes?: string[], useHybrid = true) {
+  return request<{ entities: any[]; relationships: any[]; paths: any[][]; vector_results: any[]; query_type: string }>(
+    '/api/graph/search',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        query,
+        entity_types: entityTypes || null,
+        max_hops: 2,
+        top_k: 10,
+        use_hybrid_search: useHybrid,
+      }),
+    }
+  );
+}
+
+export async function indexDocumentToGraph(documentId: string) {
+  return request<{ message: string; entities_created: number; relationships_created: number; source: string }>(
+    `/api/graph/index-document?document_id=${documentId}`,
+    { method: 'POST' }
+  );
+}
+
+export async function deleteAllGraphData() {
+  return request<{ status: string }>('/api/graph/clear', { method: 'DELETE' });
+}
+
 // ── SSE Stream Parser ─────────────────────────────────────────
 
 export async function* parseSSEStream(

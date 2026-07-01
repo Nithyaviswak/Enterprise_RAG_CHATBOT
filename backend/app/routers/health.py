@@ -40,6 +40,17 @@ async def health_check(request: Request):
     except Exception:
         services["embeddings"] = "error"
 
+    # Check Neo4j Graph
+    graph_service = getattr(request.app.state, "graph_service", None)
+    if graph_service:
+        try:
+            stats = await graph_service.get_stats()
+            services["neo4j"] = f"connected ({stats['node_count']} nodes, {stats['edge_count']} edges)"
+        except Exception:
+            services["neo4j"] = "error"
+    else:
+        services["neo4j"] = "not_configured"
+
     return {
         "status": "healthy",
         "version": settings.app_version,

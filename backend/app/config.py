@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     # Firebase Auth (optional)
     firebase_credentials_path: str = ""
 
+    # Neo4j Graph Database
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str = "changeme-password"
+    neo4j_database: str = "neo4j"
+    graph_embedding_model: str = "all-MiniLM-L6-v2"
+    entity_extraction_model: str = "gemini-2.5-flash"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @property

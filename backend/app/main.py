@@ -26,7 +26,14 @@ from app.services.embedding_service import EmbeddingService
 from app.services.vector_store import VectorStoreService
 from app.services.retrieval_service import RetrievalService
 from app.services.chat_service import ChatService
-from app.routers import chat, documents, finetune, health
+from app.services.knowledge_graph import (
+    GraphService,
+    EntityExtractor,
+    RelationshipExtractor,
+    GraphRetriever,
+    GraphEmbeddingService,
+)
+from app.routers import chat, documents, finetune, health, graph
 from app.middleware.rate_limit import limiter, rate_limit_handler
 from app.middleware.auth import FirebaseAuthMiddleware
 
@@ -90,10 +97,43 @@ async def lifespan(app: FastAPI):
     app.state.gemini_service = gemini_service
     logger.info("✅ Gemini service ready")
 
-    # 6. Chat service (orchestration)
+    # 6. Knowledge Graph services
+    try:
+        graph_service = GraphService()
+        await graph_service.initialize()
+        app.state.graph_service = graph_service
+        logger.info("✅ Knowledge graph service ready")
+    except Exception as e:
+        logger.warning(f"⚠️  Neo4j not available — graph features disabled: {e}")
+        app.state.graph_service = None
+
+    entity_extractor = EntityExtractor(gemini_service=gemini_service)
+    app.state.entity_extractor = entity_extractor
+    logger.info("✅ Entity extractor ready")
+
+    relationship_extractor = RelationshipExtractor(gemini_service=gemini_service)
+    app.state.relationship_extractor = relationship_extractor
+    logger.info("✅ Relationship extractor ready")
+
+    graph_embeddings = GraphEmbeddingService(
+        embedding_service=embedding_service,
+        graph_service=graph_service,
+    )
+    app.state.graph_embeddings = graph_embeddings
+
+    graph_retriever = GraphRetriever(
+        graph_service=graph_service,
+        embedding_service=embedding_service,
+        vector_store=vector_store,
+    )
+    app.state.graph_retriever = graph_retriever
+    logger.info("✅ Graph retriever ready")
+
+    # 7. Chat service (orchestration)
     chat_service = ChatService(
         gemini_service=gemini_service,
         retrieval_service=retrieval_service,
+        graph_retriever=graph_retriever,
     )
     app.state.chat_service = chat_service
     logger.info("✅ Chat service ready")
@@ -106,6 +146,9 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cleanup
+    graph_service = getattr(app.state, "graph_service", None)
+    if graph_service:
+        await graph_service.close()
     logger.info("Shutting down services...")
 
 
@@ -146,6 +189,7 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(finetune.router)
+app.include_router(graph.router)
 
 
 # ── Root Redirect ─────────────────────────────────────────────

@@ -90,25 +90,39 @@ class GeminiService:
             )
         )
 
-        try:
-            response = self.client.models.generate_content_stream(
-                model=self.model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.7,
-                    top_p=0.9,
-                    max_output_tokens=4096,
-                ),
-            )
+        import asyncio
+        max_retries = 3
+        last_error = None
 
-            for chunk in response:
-                if chunk.text:
-                    yield chunk.text
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content_stream(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_prompt,
+                        temperature=0.7,
+                        top_p=0.9,
+                        max_output_tokens=4096,
+                    ),
+                )
 
-        except Exception as e:
-            logger.error(f"Gemini API error: {e}")
-            yield f"\n\n⚠️ Error communicating with Gemini API: {str(e)}"
+                for chunk in response:
+                    if chunk.text:
+                        yield chunk.text
+                return  # Success, exit the generator
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                if attempt < max_retries - 1 and ("503" in error_str or "429" in error_str or "UNAVAILABLE" in error_str):
+                    wait_time = 2 ** attempt
+                    logger.warning(f"Gemini API temporary error (attempt {attempt+1}/{max_retries}). Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    break
+
+        logger.error(f"Gemini API error: {last_error}")
+        yield f"\n\n⚠️ Error communicating with Gemini API: {str(last_error)}"
 
     async def chat(
         self,
@@ -124,16 +138,24 @@ class GeminiService:
 
     async def generate_title(self, message: str) -> str:
         """Generate a short title for a conversation based on the first message."""
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=f"Generate a concise title (max 6 words) for a conversation that starts with: '{message[:200]}'. Return ONLY the title, no quotes or extra formatting.",
-                config=types.GenerateContentConfig(
-                    temperature=0.3,
-                    max_output_tokens=30,
-                ),
-            )
-            return response.text.strip().strip('"\'') if response.text else "New Chat"
-        except Exception as e:
-            logger.error(f"Title generation error: {e}")
-            return message[:50] + "..." if len(message) > 50 else message
+        import asyncio
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=f"Generate a concise title (max 6 words) for a conversation that starts with: '{message[:200]}'. Return ONLY the title, no quotes or extra formatting.",
+                    config=types.GenerateContentConfig(
+                        temperature=0.3,
+                        max_output_tokens=30,
+                    ),
+                )
+                return response.text.strip().strip('"\'') if response.text else "New Chat"
+            except Exception as e:
+                error_str = str(e)
+                if attempt < max_retries - 1 and ("503" in error_str or "429" in error_str or "UNAVAILABLE" in error_str):
+                    await asyncio.sleep(1)
+                else:
+                    logger.error(f"Title generation error: {e}")
+                    return message[:50] + "..." if len(message) > 50 else message
+        return message[:50] + "..." if len(message) > 50 else message

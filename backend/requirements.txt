@@ -13,6 +13,7 @@ torch>=2.0.0
 
 # Vector Store
 chromadb==0.6.3
+chroma-hnswlib==0.7.6
 
 # Fine-tuning Pipeline (Plugin: finetune-embedding via LlamaIndex)
 llama-index-core>=0.13.0
@@ -52,5 +53,9 @@ pytesseract>=0.3.10
 pdf2image>=1.17.0
 
 redis>=5.0.0
+
+# Knowledge Graph (Neo4j)
+neo4j==5.28.1
+numpy>=1.24.0
 
 

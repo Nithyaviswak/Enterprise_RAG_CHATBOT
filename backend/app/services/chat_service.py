@@ -24,6 +24,7 @@ from app.models.database import (
 )
 from app.services.gemini_service import GeminiService
 from app.services.retrieval_service import RetrievalService
+from app.services.knowledge_graph.graph_retriever import GraphRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +36,11 @@ class ChatService:
         self,
         gemini_service: GeminiService,
         retrieval_service: RetrievalService,
+        graph_retriever: GraphRetriever | None = None,
     ):
         self.gemini = gemini_service
         self.retrieval = retrieval_service
+        self.graph_retriever = graph_retriever
 
     async def chat_stream(
         self,
@@ -69,18 +72,65 @@ class ChatService:
             # 2. Save user message
             await add_message(conversation_id, "user", message)
 
-            # 3. Retrieve relevant context
+            # 3. Retrieve relevant context (vector + graph in parallel)
             context = []
-            try:
-                context = await self.retrieval.retrieve(
-                    query=message,
-                    top_k=5,
-                    use_ragflow=use_ragflow,
-                )
-            except Exception as e:
-                logger.warning(f"Retrieval failed, proceeding without context: {e}")
+            graph_entities = []
+            graph_relationships = []
 
-            # 4. Send metadata event (conversation_id + sources)
+            async def retrieve_vector():
+                try:
+                    return await self.retrieval.retrieve(
+                        query=message,
+                        top_k=5,
+                        use_ragflow=use_ragflow,
+                    )
+                except Exception as e:
+                    logger.warning(f"Vector retrieval failed: {e}")
+                    return []
+
+            async def retrieve_graph():
+                if not self.graph_retriever:
+                    return [], [], []
+                try:
+                    result = await self.graph_retriever.retrieve(
+                        query=message,
+                        top_k=5,
+                        use_hybrid_search=True,
+                    )
+                    return (
+                        result.get("entities", []),
+                        result.get("relationships", []),
+                        result.get("paths", []),
+                    )
+                except Exception as e:
+                    logger.warning(f"Graph retrieval failed: {e}")
+                    return [], [], []
+
+            import asyncio
+            vector_task = asyncio.create_task(retrieve_vector())
+            graph_task = asyncio.create_task(retrieve_graph())
+            context = await vector_task
+            graph_entities, graph_relationships, graph_paths = await graph_task
+
+            # 4. Build enriched context with graph data
+            graph_context_str = ""
+            if graph_entities:
+                entity_lines = [
+                    f"- {e['name']} ({e.get('entity_type', 'entity')})"
+                    for e in graph_entities[:10]
+                ]
+                graph_context_str = "\nKnown entities in context:\n" + "\n".join(entity_lines)
+
+            if graph_relationships:
+                rel_lines = [
+                    f"- {r.get('source_name', '?')} --[{r.get('relation_type', 'related_to')}]--> {r.get('target_name', '?')}"
+                    for r in graph_relationships[:10]
+                ]
+                graph_context_str += "\nRelationships:\n" + "\n".join(rel_lines)
+
+            if graph_context_str and context:
+                context[-1]["content"] += f"\n\n{graph_context_str}"
+
             sources_summary = [
                 {"source": c.get("source", ""), "score": round(c.get("score", 0), 3)}
                 for c in context

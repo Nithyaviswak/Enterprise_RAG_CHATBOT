@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ChatMessage from './ChatMessage';
 import FileUpload from './FileUpload';
+import GraphExplorer from './GraphExplorer';
 import ThemeToggle from './ThemeToggle';
 import { Message } from '@/types';
 
@@ -34,6 +35,7 @@ export default function ChatInterface({
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [showUpload, setShowUpload] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -89,6 +91,21 @@ export default function ChatInterface({
           </div>
         </div>
         <div className="chat-header-right">
+          <button
+            className="icon-btn"
+            onClick={() => setShowGraph(true)}
+            title="Knowledge Graph"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <circle cx="19" cy="5" r="2" />
+              <circle cx="5" cy="19" r="2" />
+              <circle cx="19" cy="19" r="2" />
+              <line x1="12" y1="9" x2="12" y2="5" />
+              <line x1="14.5" y1="14.5" x2="17.5" y2="17.5" />
+              <line x1="9.5" y1="14.5" x2="6.5" y2="17.5" />
+            </svg>
+          </button>
           <button
             className="icon-btn"
             onClick={() => setShowUpload(true)}
@@ -229,6 +246,12 @@ export default function ChatInterface({
       <FileUpload
         isOpen={showUpload}
         onClose={() => setShowUpload(false)}
+      />
+
+      {/* Knowledge Graph Explorer */}
+      <GraphExplorer
+        isOpen={showGraph}
+        onClose={() => setShowGraph(false)}
       />
     </div>
   );

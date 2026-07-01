@@ -41,6 +41,31 @@ services:
     restart: unless-stopped
 
   # ── ChromaDB (Vector Store) ────────────────────────────────
+  # ── Neo4j (Knowledge Graph) ───────────────────────────────────
+  neo4j:
+    image: neo4j:5-community
+    container_name: rag-chatbot-neo4j
+    ports:
+      - "7474:7474"   # HTTP Browser
+      - "7687:7687"   # Bolt Protocol
+    environment:
+      - NEO4J_AUTH=neo4j/changeme-password
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+      - neo4j-import:/var/lib/neo4j/import
+    networks:
+      - rag-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "changeme-password", "RETURN 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  # ── ChromaDB (Vector Store) ────────────────────────────────
   chromadb:
     image: chromadb/chroma:latest
     container_name: rag-chatbot-chromadb
@@ -57,6 +82,9 @@ services:
 volumes:
   backend-data:
   chroma-data:
+  neo4j-data:
+  neo4j-logs:
+  neo4j-import:
 
 networks:
   rag-network:

@@ -37,3 +37,68 @@ export interface DocumentInfo {
   chunks_count: number;
   created_at: string;
 }
+
+// ── Knowledge Graph Types ──────────────────────────────────────
+
+export interface GraphEntity {
+  id: string;
+  name: string;
+  entity_type: string;
+  description: string;
+  aliases: string[];
+  source_document: string;
+  created_at: string;
+}
+
+export interface GraphRelationship {
+  id: string;
+  source_name: string;
+  target_name: string;
+  relation_type: string;
+  description: string;
+  weight: number;
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  description: string;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  weight: number;
+}
+
+export interface GraphExploreResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  central_entity: GraphEntity;
+}
+
+export interface GraphSearchResponse {
+  entities: GraphEntity[];
+  relationships: GraphRelationship[];
+  paths: any[][];
+  vector_results: any[];
+  query_type: string;
+}
+
+export interface GraphStats {
+  node_count: number;
+  edge_count: number;
+  entity_type_counts: Record<string, number>;
+  relation_type_counts: Record<string, number>;
+  documents_processed: number;
+}
+
+export interface EntityDetail {
+  entity: GraphEntity;
+  relationships: GraphRelationship[];
+  related_entities: GraphEntity[];
+  contexts: string[];
+}

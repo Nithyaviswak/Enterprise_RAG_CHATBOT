@@ -101,3 +101,97 @@ class RetrievedChunk(BaseModel):
     source: str
     score: float
     metadata: dict = {}
+
+
+# ── Knowledge Graph Schemas ───────────────────────────────────
+
+class EntityType(str, Enum):
+    ORGANIZATION = "Organization"
+    PERSON = "Person"
+    PRODUCT = "Product"
+    LOCATION = "Location"
+    EVENT = "Event"
+    DOCUMENT = "Document"
+    CONCEPT = "Concept"
+    DATE = "Date"
+    TECHNOLOGY = "Technology"
+
+
+class EntityBase(BaseModel):
+    name: str
+    entity_type: EntityType
+    description: str = ""
+    aliases: list[str] = []
+    metadata: dict = {}
+
+
+class EntityCreate(EntityBase):
+    pass
+
+
+class EntityResponse(EntityBase):
+    id: str
+    chunk_ids: list[str] = []
+    created_at: str = ""
+    source_document: str = ""
+
+
+class RelationshipBase(BaseModel):
+    source_id: str
+    target_id: str
+    relation_type: str
+    description: str = ""
+    weight: float = 1.0
+    metadata: dict = {}
+
+
+class RelationshipCreate(RelationshipBase):
+    pass
+
+
+class RelationshipResponse(RelationshipBase):
+    id: str
+    created_at: str = ""
+
+
+class GraphSearchRequest(BaseModel):
+    query: str
+    entity_types: list[EntityType] | None = None
+    max_hops: int = 2
+    top_k: int = 10
+    use_hybrid_search: bool = True
+
+
+class GraphSearchResponse(BaseModel):
+    entities: list[EntityResponse] = []
+    relationships: list[RelationshipResponse] = []
+    paths: list[list[dict]] = []
+    vector_results: list[RetrievedChunk] = []
+    query_type: str = "graph"
+
+
+class GraphStats(BaseModel):
+    node_count: int
+    edge_count: int
+    entity_type_counts: dict[str, int]
+    relation_type_counts: dict[str, int]
+    documents_processed: int
+
+
+class EntityDetail(BaseModel):
+    entity: EntityResponse
+    relationships: list[RelationshipResponse]
+    related_entities: list[EntityResponse]
+    contexts: list[str] = []
+
+
+class GraphExploreRequest(BaseModel):
+    entity_id: str
+    max_hops: int = 2
+    max_nodes: int = 50
+
+
+class GraphExploreResponse(BaseModel):
+    nodes: list[dict]
+    edges: list[dict]
+    central_entity: EntityResponse
