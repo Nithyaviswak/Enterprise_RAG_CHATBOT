@@ -7,6 +7,7 @@ backend/venv/
 out/
 build/
 dist/
+*.tsbuildinfo
 
 # Python
 __pycache__/
@@ -32,6 +33,15 @@ venv.bak/
 *.db
 backend/chroma_db/
 backend/data/
+
+# Python tooling
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Generated evaluation reports
+evaluation/reports/*.json
 
 # OS/Editor
 .DS_Store

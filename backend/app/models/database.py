@@ -6,8 +6,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.config import get_settings
 
-DB_PATH = os.path.join("data", "chat_history.db")
+DB_PATH = get_settings().resolve_path("data/chat_history.db")
 
 
 async def init_db():
@@ -148,13 +149,23 @@ async def add_document(filename: str, file_type: str, size_bytes: int, file_path
     return {"id": doc_id, "filename": filename, "file_type": file_type, "size_bytes": size_bytes, "status": "processing", "created_at": now}
 
 
-async def update_document_status(doc_id: str, status: str, chunks_count: int = 0):
-    """Update document processing status."""
+async def update_document_status(doc_id: str, status: str, chunks_count: int = 0, duplicate: bool = False):
+    """Update document processing status.
+
+    Args:
+        doc_id: Document id.
+        status: New status (uploading/processing/ready/error).
+        chunks_count: Number of indexed chunks.
+        duplicate: Mark the document as a duplicate (skipped re-indexing).
+    """
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE documents SET status = ?, chunks_count = ? WHERE id = ?",
-            (status, chunks_count, doc_id),
-        )
+        if duplicate:
+            await db.execute("UPDATE documents SET status='ready', chunks_count=? WHERE id=?", (0, doc_id))
+        else:
+            await db.execute(
+                "UPDATE documents SET status = ?, chunks_count = ? WHERE id = ?",
+                (status, chunks_count, doc_id),
+            )
         await db.commit()
 
 

@@ -1,0 +1,1 @@
+"""Observability package — structured tracing for the RAG pipeline."""

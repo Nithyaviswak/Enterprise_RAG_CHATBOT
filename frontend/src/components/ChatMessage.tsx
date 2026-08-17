@@ -63,16 +63,51 @@ export default function ChatMessage({ message, isStreaming }: ChatMessageProps) 
           )}
         </div>
 
+        {/* Runtime metadata strip (confidence, latency, refusal) */}
+        {!isUser && message.meta && !isStreaming && (
+          <div className="meta-strip">
+            {message.meta.refused && (
+              <span className="meta-badge meta-badge-warn" title="The system refused to answer — retrieval did not find enough reliable evidence">
+                Refused
+              </span>
+            )}
+            {message.meta.failure_type && (
+              <span className="meta-badge meta-badge-warn" title="Failure category">
+                {message.meta.failure_type}
+              </span>
+            )}
+            {message.meta.confidence && (
+              <span
+                className={`meta-badge meta-badge-${message.meta.confidence.confidence_level || 'low'}`}
+                title={`Overall confidence ${(message.meta.confidence.overall_confidence ?? 0).toFixed(2)} (retrieval ${(message.meta.confidence.retrieval_confidence ?? 0).toFixed(2)}, grounding ${(message.meta.confidence.grounding_ratio ?? 0).toFixed(2)})`}
+              >
+                Confidence {((message.meta.confidence.overall_confidence ?? 0) * 100).toFixed(0)}%
+              </span>
+            )}
+            {message.meta.latency_ms != null && (
+              <span className="meta-badge" title="End-to-end request latency">
+                {(message.meta.latency_ms / 1000).toFixed(1)}s
+              </span>
+            )}
+            {message.meta.request_id && (
+              <span className="meta-badge meta-badge-mono" title="Request ID">
+                {message.meta.request_id}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Sources */}
         {message.sources && message.sources.length > 0 && !isStreaming && (
           <div className="sources-list">
             {message.sources.map((source, i) => (
-              <span key={i} className="source-chip">
+              <span key={i} className="source-chip" title={`Relevance ${(source.score * 100).toFixed(1)}%${source.page ? ` — Page ${source.page}` : ''}`}>
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
-                {source.source} ({(source.score * 100).toFixed(0)}%)
+                {source.source}
+                {source.page ? ` · p.${source.page}` : ''} ({(source.score * 100).toFixed(0)}%)
               </span>
             ))}
           </div>

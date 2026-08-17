@@ -1,0 +1,173 @@
+{
+  "description": "RAG evaluation dataset for DocMind. Reference answers are grounded in the actual knowledge base (resume + Autonomous AI Research Agent notes). 'expected_in_corpus': false entries test the system's refusal/hallucination behaviour and are scored leniently on faithfulness/relevancy when the pipeline correctly refuses.",
+  "samples": [
+    {
+      "id": "q01",
+      "question": "What is Nithyananda Chari R's educational background?",
+      "reference_answer": "B.Tech in Artificial Intelligence and Machine Learning from Siddartha Institute of Science and Technology with a CGPA of 8.44 out of 10.0, expected to complete in May 2026.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q02",
+      "question": "Where is Nithyananda Chari R based?",
+      "reference_answer": "Bangalore, India.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q03",
+      "question": "Which technologies does the Voice Healthcare Agent project use?",
+      "reference_answer": "Python, FastAPI, WebSockets, ChromaDB, Docker, and GCP.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q04",
+      "question": "What latency target was achieved by the Voice Healthcare Agent project?",
+      "reference_answer": "Sub-3 second latency, which is 60% faster than REST baselines.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q05",
+      "question": "What frameworks power the Autonomous AI Research Agent?",
+      "reference_answer": "LangGraph and Google Gemini, with Google Search tools for live data.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q06",
+      "question": "According to the resume, how many daily records did the AI Root Cause Analyzer process?",
+      "reference_answer": "More than 10,000 daily records.",
+      "category": "specific_document",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q07",
+      "question": "What CGPA is listed on the resume?",
+      "reference_answer": "8.44 out of 10.0.",
+      "category": "specific_document",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q08",
+      "question": "Which vector and document stores are listed under the resume's technical skills?",
+      "reference_answer": "ChromaDB, FAISS, and Weaviate.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q09",
+      "question": "When did the AI Root Cause Analyzer project run?",
+      "reference_answer": "From August 2024 to October 2024.",
+      "category": "factual",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q10",
+      "question": "What is the GitHub username mentioned in the resume?",
+      "reference_answer": "Nithyaviswak.",
+      "category": "specific_document",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q11",
+      "question": "How does the Autonomous AI Research Agent handle API failures?",
+      "reference_answer": "It has a self-healing failover system that detects 429 Resource Exhausted and 404 Model Not Found errors and hot-swaps to backup models without crashing.",
+      "category": "multi_step",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q12",
+      "question": "What deployment platform is used for the Autonomous AI Research Agent?",
+      "reference_answer": "Streamlit Cloud, with CI/CD via GitHub.",
+      "category": "specific_document",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q13",
+      "question": "Which backend frameworks and languages does Nithyananda list under technical skills?",
+      "reference_answer": "Languages Python, Java, JavaScript, TypeScript and SQL; backend frameworks FastAPI, Flask and Node.js; databases PostgreSQL, MongoDB and vector stores ChromaDB, FAISS and Weaviate; frontend React and Next.js.",
+      "category": "multi_step",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q14",
+      "question": "Compare the latency and accuracy improvements reported for the Voice Healthcare Agent and the AI Root Cause Analyzer projects.",
+      "reference_answer": "Voice Healthcare Agent achieved sub-3s latency (60% faster than REST), indexed 10,000+ documents, cut retrieval errors by 73% and supported 50+ concurrent users at 99.2% uptime. AI Root Cause Analyzer processed 10,000+ daily records with 85% pattern-identification accuracy, cut manual QA overhead by 45% and reduced latency from 8.2s to 4.9s (40% improvement).",
+      "category": "multi_step",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q15",
+      "question": "What is the Autonomous AI Research Agent project about?",
+      "reference_answer": "The documents describe two projects: the Autonomous AI Research Agent, an agentic workflow built with LangGraph and Google Gemini that performs deep web research and generates structured reports, and engineering projects in a resume such as the Voice Healthcare Agent and the AI Root Cause Analyzer.",
+      "category": "ambiguous",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q16",
+      "question": "What is RAG?",
+      "reference_answer": "The Autonomous AI Research Agent document mentions RAG as Retrieval Augmented Generation, used to fetch live data for the research workflow.",
+      "category": "ambiguous",
+      "expected_in_corpus": true
+    },
+    {
+      "id": "q17",
+      "question": "What is the capital of Australia?",
+      "reference_answer": "",
+      "category": "no_answer",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q18",
+      "question": "How many employees work at Siddartha Institute of Science and Technology?",
+      "reference_answer": "",
+      "category": "no_answer",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q19",
+      "question": "What is the current price of Bitcoin?",
+      "reference_answer": "",
+      "category": "no_answer",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q20",
+      "question": "What is Nithyananda's date of birth?",
+      "reference_answer": "",
+      "category": "hallucination_probe",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q21",
+      "question": "Which awards has Nithyananda Chari R received?",
+      "reference_answer": "",
+      "category": "hallucination_probe",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q22",
+      "question": "Who were the team members on the Voice Healthcare Agent project?",
+      "reference_answer": "",
+      "category": "hallucination_probe",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q23",
+      "question": "Which OpenAI models does the Autonomous AI Research Agent use?",
+      "reference_answer": "",
+      "category": "hallucination_probe",
+      "expected_in_corpus": false
+    },
+    {
+      "id": "q24",
+      "question": "What is the contact phone number for the university?",
+      "reference_answer": "",
+      "category": "hallucination_probe",
+      "expected_in_corpus": false
+    }
+  ]
+}

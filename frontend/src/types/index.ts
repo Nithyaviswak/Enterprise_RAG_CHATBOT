@@ -4,11 +4,68 @@ export interface Message {
   content: string;
   sources: Source[];
   created_at: string;
+  meta?: AssistantMeta | null;
 }
 
 export interface Source {
   source: string;
   score: number;
+  page?: number | null;
+  id?: string | null;
+}
+
+export interface Confidence {
+  overall_confidence: number;
+  confidence_level: 'low' | 'medium' | 'high';
+  retrieval_confidence: number;
+  grounding_ratio: number;
+  risky?: boolean;
+}
+
+export interface AssistantMeta {
+  request_id: string;
+  latency_ms: number | null;
+  confidence: Confidence | null;
+  failure_type: string | null;
+  refused: boolean;
+  answered: boolean;
+  hallucination?: { risk_level: string; grounded_ratio: number } | null;
+}
+
+export interface DebugInfo {
+  query: string;
+  request_id: string;
+  retrieved_documents: Array<{
+    source: string;
+    page?: number | null;
+    score?: number;
+    rerank_score?: number | null;
+    retrieval_method?: string;
+    excerpt?: string;
+  }>;
+  retrieval_confidence: number | null;
+  retrieval_methods: string[];
+  similarity_scores: number[];
+  reranking_scores: number[];
+  final_context: string[];
+  system_prompt?: string | null;
+  confidence: Confidence | null;
+  failure_type: string | null;
+  stage_times: Record<string, { latency_ms: number; status: string; [key: string]: any }>;
+  timestamp: string;
+}
+
+export interface LiveMetrics {
+  total_requests: number;
+  avg_retrieval_latency_ms: number | null;
+  avg_generation_latency_ms: number | null;
+  avg_total_latency_ms: number | null;
+  avg_retrieval_confidence: number | null;
+  avg_grounding_ratio: number | null;
+  refusal_rate: number;
+  hallucination_risk_rate: number;
+  failure_counts: Record<string, number>;
+  recent: Record<string, any>[];
 }
 
 export interface Conversation {
@@ -20,10 +77,17 @@ export interface Conversation {
 }
 
 export interface ChatStreamEvent {
-  type: 'metadata' | 'token' | 'title' | 'done' | 'error';
+  type: 'metadata' | 'token' | 'title' | 'done' | 'error' | 'debug';
   content?: string;
   conversation_id?: string;
   sources?: Source[];
+  confidence?: Confidence;
+  request_id?: string;
+  latency_ms?: number | null;
+  failure_type?: string | null;
+  refused?: boolean;
+  answered?: boolean;
+  debug?: DebugInfo;
   title?: string;
   message?: string;
 }

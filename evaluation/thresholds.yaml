@@ -1,0 +1,12 @@
+# RAG evaluation release-gate thresholds.
+#
+# `evaluate.py` fails the build (non-zero exit) when any measured metric is
+# worse than these values. Override at runtime with:
+#   RAG_EVAL_FAITHFULNESS_MIN=0.85 python evaluation/evaluate.py
+# or via the --min-* CLI flags.
+
+faithfulness_min: 0.50
+answer_relevancy_min: 0.50
+context_precision_min: 0.50
+context_recall_min: 0.40
+hallucination_rate_max: 0.30

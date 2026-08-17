@@ -20,6 +20,13 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.models.database import init_db
+from app.observability.tracing import MetricsStore
+from app.rag.generator import Generator, PromptBuilder
+from app.rag.guardrails import Guardrails
+from app.rag.hallucination import HallucinationDetector
+from app.rag.pipeline import RagPipeline
+from app.rag.retriever import Retriever
+from app.rag.reranker import Reranker
 from app.services.gemini_service import GeminiService
 from app.services.ragflow_client import RAGFlowClient
 from app.services.embedding_service import EmbeddingService
@@ -33,7 +40,7 @@ from app.services.knowledge_graph import (
     GraphRetriever,
     GraphEmbeddingService,
 )
-from app.routers import chat, documents, finetune, health, graph
+from app.routers import chat, documents, evaluation, finetune, health, graph
 from app.middleware.rate_limit import limiter, rate_limit_handler
 from app.middleware.auth import FirebaseAuthMiddleware
 
@@ -57,8 +64,8 @@ async def lifespan(app: FastAPI):
 
     # Create data directories
     os.makedirs("data", exist_ok=True)
-    os.makedirs(settings.upload_dir, exist_ok=True)
-    os.makedirs(settings.chroma_persist_dir, exist_ok=True)
+    os.makedirs(settings.resolve_path(settings.upload_dir), exist_ok=True)
+    os.makedirs(settings.resolve_path(settings.chroma_persist_dir), exist_ok=True)
 
     # Initialize database
     await init_db()
@@ -97,6 +104,24 @@ async def lifespan(app: FastAPI):
     app.state.gemini_service = gemini_service
     logger.info("✅ Gemini service ready")
 
+    # 5b. Production RAG pipeline (retrieval → guardrails → generation → verify)
+    rag_retriever = Retriever(
+        vector_store=vector_store,
+        embedding_service=embedding_service,
+        ragflow_client=ragflow_client,
+        reranker=Reranker(embedding_service=embedding_service),
+    )
+    rag_pipeline = RagPipeline(
+        retriever=rag_retriever,
+        generator=Generator(gemini_service, PromptBuilder()),
+        guardrails=Guardrails(),
+        hallucination_detector=HallucinationDetector(),
+        prompt_builder=PromptBuilder(),
+    )
+    app.state.rag_pipeline = rag_pipeline
+    app.state.metrics_store = MetricsStore.get()
+    logger.info("✅ Production RAG pipeline ready")
+
     # 6. Knowledge Graph services
     try:
         graph_service = GraphService()
@@ -134,6 +159,8 @@ async def lifespan(app: FastAPI):
         gemini_service=gemini_service,
         retrieval_service=retrieval_service,
         graph_retriever=graph_retriever,
+        rag_pipeline=rag_pipeline,
+        metrics_store=app.state.metrics_store,
     )
     app.state.chat_service = chat_service
     logger.info("✅ Chat service ready")
@@ -190,6 +217,7 @@ app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(finetune.router)
 app.include_router(graph.router)
+app.include_router(evaluation.router)
 
 
 # ── Root Redirect ─────────────────────────────────────────────

@@ -22,7 +22,7 @@ class VectorStoreService:
 
     def __init__(self, embedding_service=None):
         settings = get_settings()
-        persist_dir = settings.chroma_persist_dir
+        persist_dir = settings.resolve_path(settings.chroma_persist_dir)
         os.makedirs(persist_dir, exist_ok=True)
 
         self.client = chromadb.PersistentClient(

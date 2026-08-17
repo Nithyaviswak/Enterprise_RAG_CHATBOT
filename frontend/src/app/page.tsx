@@ -16,6 +16,9 @@ export default function Home() {
     conversations,
     activeConversationId,
     isStreaming,
+    debugMode,
+    lastDebug,
+    toggleDebugMode,
     sendMessage,
     stopStreaming,
     newChat,
@@ -51,6 +54,9 @@ export default function Home() {
         onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
         theme={theme}
         onToggleTheme={toggleTheme}
+        debugMode={debugMode}
+        lastDebug={lastDebug}
+        onToggleDebug={toggleDebugMode}
       />
     </div>
   );

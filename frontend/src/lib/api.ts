@@ -39,7 +39,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export async function sendMessage(
   message: string,
   conversationId: string | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  debugMode = false
 ): Promise<Response> {
   const url = `${API_BASE}/api/chat`;
   return fetch(url, {
@@ -49,9 +50,25 @@ export async function sendMessage(
       message,
       conversation_id: conversationId,
       use_ragflow: true,
+      debug_mode: debugMode,
     }),
     signal,
   });
+}
+
+export async function getLiveMetrics() {
+  return request<{
+    total_requests: number;
+    avg_retrieval_latency_ms: number | null;
+    avg_generation_latency_ms: number | null;
+    avg_total_latency_ms: number | null;
+    avg_retrieval_confidence: number | null;
+    avg_grounding_ratio: number | null;
+    refusal_rate: number;
+    hallucination_risk_rate: number;
+    failure_counts: Record<string, number>;
+    recent: Record<string, any>[];
+  }>('/api/evaluation/metrics/live');
 }
 
 export async function getConversations() {

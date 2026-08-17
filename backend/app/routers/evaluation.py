@@ -133,6 +133,15 @@ async def get_statistics(request: Request):
     return eval_service.get_statistics()
 
 
+@router.get("/metrics/live")
+async def get_live_metrics(request: Request):
+    """Get live runtime metrics from the RAG metrics store (dashboard)."""
+    from app.observability.tracing import MetricsStore
+
+    store = MetricsStore.get()
+    return store.summarize()
+
+
 @router.get("/results")
 async def get_results(request: Request, format: str = "json"):
     """Get all evaluation results.

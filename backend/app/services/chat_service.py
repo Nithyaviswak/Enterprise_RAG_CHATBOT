@@ -1,12 +1,18 @@
 """
-Chat Service — RAG Pipeline Orchestration.
+Chat Service — RAG Pipeline Orchestration (production).
 
-Orchestrates the complete RAG flow:
-1. Receive user query
-2. Retrieve relevant context
-3. Inject context into Gemini prompt
-4. Stream response back
-5. Store conversation history
+Routes every message through the production RAG pipeline and streams the
+result back over SSE. Each request is traced (request_id, stage latencies,
+failure categories) and recorded in the metrics store.
+
+SSE events:
+- data: {"type": "metadata", "conversation_id", "sources", "confidence",
+          "request_id", "latency_ms", "failure_type", "refused"}
+- data: {"type": "token", "content": "..."}
+- data: {"type": "title", "title": "..."}
+- data: {"type": "debug", ...}     (only when debug mode is enabled)
+- data: {"type": "done"}
+- data: {"type": "error", "message": "..."}
 """
 
 import json
@@ -22,40 +28,47 @@ from app.models.database import (
     add_message,
     get_messages,
 )
-from app.services.gemini_service import GeminiService
-from app.services.retrieval_service import RetrievalService
-from app.services.knowledge_graph.graph_retriever import GraphRetriever
+from app.observability.tracing import Tracer
+from app.rag.pipeline import RagPipeline
 
 logger = logging.getLogger(__name__)
 
+_TOKEN_CHUNK_SIZE = 80
+
 
 class ChatService:
-    """Orchestrates the RAG chatbot pipeline."""
+    """Orchestrates the RAG chatbot pipeline with tracing and guardrails."""
 
     def __init__(
         self,
-        gemini_service: GeminiService,
-        retrieval_service: RetrievalService,
-        graph_retriever: GraphRetriever | None = None,
+        gemini_service,
+        retrieval_service,
+        graph_retriever=None,
+        rag_pipeline: Optional[RagPipeline] = None,
+        metrics_store=None,
+        settings=None,
     ):
         self.gemini = gemini_service
         self.retrieval = retrieval_service
         self.graph_retriever = graph_retriever
+        self.rag_pipeline = rag_pipeline
+        self.metrics_store = metrics_store
+        from app.config import get_settings
+
+        self.settings = get_settings()
 
     async def chat_stream(
         self,
         message: str,
         conversation_id: Optional[str] = None,
         use_ragflow: bool = True,
+        debug_mode: Optional[bool] = None,
     ) -> AsyncGenerator[str, None]:
-        """Process a chat message through the full RAG pipeline with streaming.
+        """Process a chat message through the full RAG pipeline with streaming."""
+        tracer = Tracer.new(message)
+        request_id = tracer.request_id
+        debug_mode = self.settings.rag_debug_mode if debug_mode is None else debug_mode
 
-        Yields SSE-formatted events:
-        - data: {"type": "metadata", "conversation_id": "...", "sources": [...]}
-        - data: {"type": "token", "content": "..."}
-        - data: {"type": "done"}
-        - data: {"type": "error", "message": "..."}
-        """
         try:
             # 1. Create or get conversation
             if not conversation_id:
@@ -72,98 +85,54 @@ class ChatService:
             # 2. Save user message
             await add_message(conversation_id, "user", message)
 
-            # 3. Retrieve relevant context (vector + graph in parallel)
-            context = []
-            graph_entities = []
-            graph_relationships = []
-
-            async def retrieve_vector():
-                try:
-                    return await self.retrieval.retrieve(
-                        query=message,
-                        top_k=5,
-                        use_ragflow=use_ragflow,
-                    )
-                except Exception as e:
-                    logger.warning(f"Vector retrieval failed: {e}")
-                    return []
-
-            async def retrieve_graph():
-                if not self.graph_retriever:
-                    return [], [], []
-                try:
-                    result = await self.graph_retriever.retrieve(
-                        query=message,
-                        top_k=5,
-                        use_hybrid_search=True,
-                    )
-                    return (
-                        result.get("entities", []),
-                        result.get("relationships", []),
-                        result.get("paths", []),
-                    )
-                except Exception as e:
-                    logger.warning(f"Graph retrieval failed: {e}")
-                    return [], [], []
-
-            import asyncio
-            vector_task = asyncio.create_task(retrieve_vector())
-            graph_task = asyncio.create_task(retrieve_graph())
-            context = await vector_task
-            graph_entities, graph_relationships, graph_paths = await graph_task
-
-            # 4. Build enriched context with graph data
-            graph_context_str = ""
-            if graph_entities:
-                entity_lines = [
-                    f"- {e['name']} ({e.get('entity_type', 'entity')})"
-                    for e in graph_entities[:10]
-                ]
-                graph_context_str = "\nKnown entities in context:\n" + "\n".join(entity_lines)
-
-            if graph_relationships:
-                rel_lines = [
-                    f"- {r.get('source_name', '?')} --[{r.get('relation_type', 'related_to')}]--> {r.get('target_name', '?')}"
-                    for r in graph_relationships[:10]
-                ]
-                graph_context_str += "\nRelationships:\n" + "\n".join(rel_lines)
-
-            if graph_context_str and context:
-                context[-1]["content"] += f"\n\n{graph_context_str}"
-
-            sources_summary = [
-                {"source": c.get("source", ""), "score": round(c.get("score", 0), 3)}
-                for c in context
-            ]
-
-            yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id, 'sources': sources_summary})}\n\n"
-
-            # 5. Get conversation history for context
+            # 3. Run the production RAG pipeline (retrieval → guardrails → generation)
             history = await get_messages(conversation_id)
             history_formatted = [
                 {"role": msg["role"], "content": msg["content"]}
-                for msg in history[:-1]  # Exclude the message we just added
+                for msg in history[:-1]  # exclude the message we just added
             ]
 
-            # 6. Stream Gemini response
-            full_response = ""
-            async for token in self.gemini.chat_stream(
-                message=message,
+            result = await self.rag_pipeline.run(
+                query=message,
                 history=history_formatted,
-                context=context,
-            ):
-                full_response += token
-                yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+                use_ragflow=use_ragflow,
+                debug=debug_mode,
+                tracer=tracer,
+            )
 
-            # 7. Save assistant response
+            # 4. Record metrics for observability / dashboard
+            self._record_metrics(result, request_id, tracer)
+
+            # 5. Emit metadata with sources + confidence + latency
+            sources = [
+                {
+                    "source": s.get("source", "Unknown"),
+                    "page": s.get("page"),
+                    "score": s.get("score", 0.0),
+                    "id": s.get("id"),
+                }
+                for s in result.sources
+            ]
+            yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id, 'sources': sources, 'confidence': result.confidence, 'request_id': request_id, 'latency_ms': result.trace.get('total_latency_ms'), 'failure_type': result.failure_type, 'refused': result.refused, 'answered': result.answered})}\n\n"
+
+            # 6. Debug payload for developer mode (never for normal users)
+            if debug_mode and result.debug:
+                yield f"data: {json.dumps({'type': 'debug', 'debug': result.debug})}\n\n"
+
+            # 7. Stream the answer (chunked so the UI keeps its streaming feel)
+            answer = result.answer
+            for i in range(0, len(answer), _TOKEN_CHUNK_SIZE):
+                yield f"data: {json.dumps({'type': 'token', 'content': answer[i:i + _TOKEN_CHUNK_SIZE]})}\n\n"
+
+            # 8. Save assistant response with source attribution
             await add_message(
                 conversation_id,
                 "assistant",
-                full_response,
-                json.dumps(sources_summary),
+                answer,
+                json.dumps(sources),
             )
 
-            # 8. Generate title for new conversations
+            # 9. Generate title for new conversations
             if is_new:
                 try:
                     title = await self.gemini.generate_title(message)
@@ -176,7 +145,30 @@ class ChatService:
 
         except Exception as e:
             logger.error(f"Chat pipeline error: {e}", exc_info=True)
+            tracer.set_failure("RETRIEVAL_FAILURE", str(e))
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    def _record_metrics(self, result, request_id: str, tracer: Tracer):
+        """Record a safe metrics entry for the dashboard."""
+        if not self.metrics_store:
+            return
+        from datetime import datetime, timezone
+
+        entry = {
+            "request_id": request_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "retrieval_latency_ms": result.trace.get("stages", {}).get("retrieval", {}).get("latency_ms"),
+            "generation_latency_ms": result.trace.get("stages", {}).get("generation", {}).get("latency_ms"),
+            "total_latency_ms": result.trace.get("total_latency_ms"),
+            "chunks": len(result.sources),
+            "retrieval_confidence": result.confidence.get("retrieval_confidence"),
+            "model_used": self.settings.gemini_model,
+            "failure_type": result.failure_type,
+            "answered": result.answered,
+            "grounded_ratio": result.hallucination.get("grounded_ratio"),
+            "refused": result.refused,
+        }
+        self.metrics_store.record(entry)
 
     async def get_conversations(self) -> list[dict]:
         """Get all conversations."""

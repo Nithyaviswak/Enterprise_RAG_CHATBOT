@@ -18,6 +18,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=10000)
     conversation_id: Optional[str] = None
     use_ragflow: bool = True
+    debug_mode: Optional[bool] = None
 
 
 class ChatMessage(BaseModel):
@@ -101,6 +102,22 @@ class RetrievedChunk(BaseModel):
     source: str
     score: float
     metadata: dict = {}
+    page: Optional[int] = None
+
+
+# ── RAG Observability Schemas ──────────────────────────────────
+
+class MetricsSummary(BaseModel):
+    total_requests: int = 0
+    avg_retrieval_latency_ms: Optional[float] = None
+    avg_generation_latency_ms: Optional[float] = None
+    avg_total_latency_ms: Optional[float] = None
+    avg_retrieval_confidence: Optional[float] = None
+    avg_grounding_ratio: Optional[float] = None
+    refusal_rate: float = 0.0
+    hallucination_risk_rate: float = 0.0
+    failure_counts: dict[str, int] = {}
+    recent: list[dict] = []
 
 
 # ── Knowledge Graph Schemas ───────────────────────────────────

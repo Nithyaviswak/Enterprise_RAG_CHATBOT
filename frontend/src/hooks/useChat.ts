@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Message, Source, Conversation } from '@/types';
+import { Message, Source, Conversation, AssistantMeta, DebugInfo } from '@/types';
 import {
   sendMessage as apiSendMessage,
   parseSSEStream,
@@ -16,6 +16,9 @@ export function useChat() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
+  const [debugMode, setDebugMode] = useState(false);
+  const [lastMeta, setLastMeta] = useState<AssistantMeta | null>(null);
+  const [lastDebug, setLastDebug] = useState<DebugInfo | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load conversations list
@@ -82,7 +85,8 @@ export function useChat() {
       const response = await apiSendMessage(
         content,
         activeConversationId,
-        abortController.signal
+        abortController.signal,
+        debugMode
       );
 
       if (!response.ok) {
@@ -90,6 +94,7 @@ export function useChat() {
       }
 
       let currentSources: Source[] = [];
+      let meta: AssistantMeta | null = null;
 
       for await (const event of parseSSEStream(response)) {
         switch (event.type) {
@@ -99,6 +104,25 @@ export function useChat() {
             }
             currentSources = event.sources || [];
             setSources(currentSources);
+            meta = {
+              request_id: event.request_id || '',
+              latency_ms: event.latency_ms ?? null,
+              confidence: event.confidence || null,
+              failure_type: event.failure_type ?? null,
+              refused: !!event.refused,
+              answered: !!event.answered,
+            };
+            setLastMeta(meta);
+            // Attach metadata to the in-flight assistant message too.
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, meta } : m
+              )
+            );
+            break;
+
+          case 'debug':
+            if (event.debug) setLastDebug(event.debug);
             break;
 
           case 'token':
@@ -126,10 +150,12 @@ export function useChat() {
             break;
 
           case 'done':
-            // Attach sources to the assistant message
+            // Attach sources + metadata to the assistant message
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantId ? { ...m, sources: currentSources } : m
+                m.id === assistantId
+                  ? { ...m, sources: currentSources, meta: meta || m.meta }
+                  : m
               )
             );
             break;
@@ -161,7 +187,7 @@ export function useChat() {
       // Refresh conversation list
       await loadConversations();
     }
-  }, [isStreaming, activeConversationId, loadConversations]);
+  }, [isStreaming, activeConversationId, loadConversations, debugMode]);
 
   // Stop streaming
   const stopStreaming = useCallback(() => {
@@ -174,7 +200,12 @@ export function useChat() {
     setMessages([]);
     setActiveConversationId(null);
     setSources([]);
+    setLastMeta(null);
+    setLastDebug(null);
   }, []);
+
+  // Toggle developer/debug mode
+  const toggleDebugMode = useCallback(() => setDebugMode((prev) => !prev), []);
 
   // Delete conversation
   const deleteConversation = useCallback(async (conversationId: string) => {
@@ -195,6 +226,10 @@ export function useChat() {
     activeConversationId,
     isStreaming,
     sources,
+    debugMode,
+    lastMeta,
+    lastDebug,
+    toggleDebugMode,
     sendMessage,
     stopStreaming,
     newChat,

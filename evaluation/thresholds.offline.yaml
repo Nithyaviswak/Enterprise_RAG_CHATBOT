@@ -1,0 +1,13 @@
+# Thresholds for OFFLINE (hermetic CI) evaluation runs.
+#
+# Offline mode uses deterministic stub retriever/generator + a simple
+# bag-of-words embedder, so answer_relevancy cannot reach sentence-transformer
+# levels. These relaxed values still prove the harness, metric computation, gate
+# evaluation and reporting all work end-to-end in CI with no network or API key.
+# Production quality gates use `thresholds.yaml` with real retrieval + LLM.
+
+faithfulness_min: 0.60
+answer_relevancy_min: 0.15
+context_precision_min: 0.50
+context_recall_min: 0.40
+hallucination_rate_max: 0.50

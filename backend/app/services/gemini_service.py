@@ -66,9 +66,19 @@ class GeminiService:
         message: str,
         history: list[dict] | None = None,
         context: list[dict] | None = None,
+        system_prompt: str | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream a chat response from Gemini with RAG context."""
-        system_prompt = self._build_system_prompt(context)
+        """Stream a chat response from Gemini with RAG context.
+
+        Args:
+            message: The user message.
+            history: Prior conversation turns.
+            context: Retrieved RAG context chunks (used to build the prompt when
+                ``system_prompt`` is not provided).
+            system_prompt: Explicit grounded system prompt (preferred when set by
+                the RAG pipeline).
+        """
+        effective_prompt = system_prompt or self._build_system_prompt(context)
 
         # Build conversation contents
         contents = []
@@ -91,7 +101,8 @@ class GeminiService:
         )
 
         import asyncio
-        max_retries = 3
+        import re
+        max_retries = 5
         last_error = None
 
         for attempt in range(max_retries):
@@ -100,10 +111,10 @@ class GeminiService:
                     model=self.model,
                     contents=contents,
                     config=types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        temperature=0.7,
+                        system_instruction=effective_prompt,
+                        temperature=get_settings().llm_temperature,
                         top_p=0.9,
-                        max_output_tokens=4096,
+                        max_output_tokens=get_settings().llm_max_output_tokens,
                     ),
                 )
 
@@ -115,8 +126,26 @@ class GeminiService:
                 last_error = e
                 error_str = str(e)
                 if attempt < max_retries - 1 and ("503" in error_str or "429" in error_str or "UNAVAILABLE" in error_str):
-                    wait_time = 2 ** attempt
-                    logger.warning(f"Gemini API temporary error (attempt {attempt+1}/{max_retries}). Retrying in {wait_time}s...")
+                    # A per-day/per-project quota is not recoverable by waiting short periods.
+                    if "PerDay" in error_str or "per_day" in error_str or "Quota exceeded for metric" in error_str and "day" in error_str.lower():
+                        logger.error("Gemini daily quota exhausted; not retrying.")
+                        break
+                    # Honor Gemini's RetryInfo.retryDelay when present (e.g. per-minute quota),
+                    # otherwise fall back to exponential backoff.
+                    retry_delay = None
+                    match = re.search(r"retryDelay['\"]?\s*[:=]\s*['\"]?(\d+\.?\d*)s?", error_str)
+                    if not match:
+                        match = re.search(r"Please retry in (\d+\.?\d*)s", error_str)
+                    if match:
+                        try:
+                            retry_delay = float(match.group(1))
+                        except ValueError:
+                            retry_delay = None
+                    wait_time = max(2 ** attempt, min(retry_delay + 1, 60)) if retry_delay else 2 ** attempt
+                    logger.warning(
+                        f"Gemini API temporary error (attempt {attempt+1}/{max_retries}). "
+                        f"Retrying in {wait_time:.1f}s..."
+                    )
                     await asyncio.sleep(wait_time)
                 else:
                     break

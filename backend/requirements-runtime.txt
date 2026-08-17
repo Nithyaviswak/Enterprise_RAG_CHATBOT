@@ -1,0 +1,20 @@
+# Core runtime dependencies for the RAG pipeline + evaluation harness.
+#
+# This is the LEAN set required to run the pipeline, tests, and the offline
+# evaluation in CI. The full `requirements.txt` adds optional ML/finetuning,
+# RAGAS, LangSmith, unstructured, OCR, Redis and Firebase integrations that are
+# only needed on machines that actually use those features.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic-settings==2.7.1
+google-genai==1.5.0
+chromadb==0.6.3
+numpy>=1.24.0
+rank-bm25==0.2.2
+aiosqlite==0.20.0
+slowapi==0.1.9
+pypdf==5.4.0
+python-docx==1.1.2
+httpx==0.28.1
+PyYAML>=6.0
+tqdm>=4.66.0

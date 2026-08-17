@@ -24,12 +24,14 @@ async def chat(request: Request, body: ChatRequest):
     - done: completion signal
     """
     chat_service = request.app.state.chat_service
+    debug_mode = getattr(request.app.state, "rag_debug_mode", False)
 
     return StreamingResponse(
         chat_service.chat_stream(
             message=body.message,
             conversation_id=body.conversation_id,
             use_ragflow=body.use_ragflow,
+            debug_mode=body.debug_mode if body.debug_mode is not None else debug_mode,
         ),
         media_type="text/event-stream",
         headers={

@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ChatMessage from './ChatMessage';
+import DevPanel from './DevPanel';
 import FileUpload from './FileUpload';
 import GraphExplorer from './GraphExplorer';
 import ThemeToggle from './ThemeToggle';
-import { Message } from '@/types';
+import { Message, DebugInfo } from '@/types';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -15,6 +16,9 @@ interface ChatInterfaceProps {
   onToggleSidebar: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  debugMode?: boolean;
+  lastDebug?: DebugInfo | null;
+  onToggleDebug?: () => void;
 }
 
 const SUGGESTIONS = [
@@ -32,6 +36,9 @@ export default function ChatInterface({
   onToggleSidebar,
   theme,
   onToggleTheme,
+  debugMode = false,
+  lastDebug = null,
+  onToggleDebug,
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [showUpload, setShowUpload] = useState(false);
@@ -92,6 +99,17 @@ export default function ChatInterface({
         </div>
         <div className="chat-header-right">
           <button
+            className={`icon-btn ${debugMode ? 'active' : ''}`}
+            onClick={onToggleDebug}
+            title={debugMode ? 'Disable developer mode (returns retrieval internals)' : 'Enable developer mode (returns retrieval internals)'}
+            style={debugMode ? { color: 'var(--color-accent)' } : undefined}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+          </button>
+          <button
             className="icon-btn"
             onClick={() => setShowGraph(true)}
             title="Knowledge Graph"
@@ -120,6 +138,9 @@ export default function ChatInterface({
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         </div>
       </header>
+
+      {/* Developer insights panel */}
+      {debugMode && <DevPanel debug={lastDebug} />}
 
       {/* Messages or Welcome Screen */}
       <div className="messages-container">
